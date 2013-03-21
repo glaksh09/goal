@@ -1,0 +1,4 @@
+goal
+====
+
+Go Analysis Library
