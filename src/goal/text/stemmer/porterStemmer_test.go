@@ -19,4 +19,8 @@ func TestStemmer(t *testing.T) {
 	stemmer.reset()
 	fmt.Println(stemmer)
 
+	//check stem
+	stemmer.Stem(dogs)
+	fmt.Println(stemmer)
+
 }

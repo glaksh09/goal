@@ -11,6 +11,7 @@ type PorterStemmer struct {
 //reset the stemmer to stem another word
 //call reset() if calling add(byte) and then stem()
 func (s *PorterStemmer) Reset() error {
+	s.b = new([]byte)
 	s.i = 0
 	s.dirty = false
 	return nil
@@ -378,3 +379,150 @@ func (s *PorterStemmer) Step4() error {
 /*
 Step 5: handle -ant, -ence
 */
+func (s *PorterStemmer) Step5() error {
+	if s.k == s.k0 {
+		return nil
+	}
+
+	switch s.b[k-1] {
+	case 'a':
+		if s.Ends("al") {
+			s.SetBufferOnConsSeq("ate")
+			break
+		}
+	case 'c':
+		if s.Ends("ance") {
+			break
+		}
+		if s.Ends("ence") {
+			break
+		}
+	case 'e':
+		if s.Ends("er") {
+			break
+		}
+	case 'i':
+		if s.Ends("ic") {
+			break
+		}
+
+	case 'l':
+		if s.Ends("able") {
+			break
+		}
+		if s.Ends("ible") {
+			break
+		}
+	case 'n':
+		if s.Ends("ant") {
+			break
+		}
+		if s.Ends("ement") {
+			break
+		}
+		if s.Ends("ment") {
+			break
+		}
+		if s.Ends("ent") {
+			break
+		}
+	case 'o':
+		if s.Ends("ion") && s.j >= 0 && (s.b[s.j] == 's' || s.b[s.j] == 't') {
+			break
+		}
+		if s.Ends("ou") {
+			break
+		}
+	case 's':
+		if s.Ends("ism") {
+			break
+		}
+	case 't':
+		if s.Ends("ate") {
+			break
+		}
+		if s.Ends("iti") {
+			break
+		}
+	case 'u':
+		if s.Ends("ous") {
+			break
+		}
+	case 'v':
+		if s.Ends("ive") {
+			break
+		}
+	case 'z':
+		if s.Ends("ize") {
+			break
+		}
+	default:
+		return nil
+	}
+
+	if s.CountConsSeq() > 1 {
+		s.k = s.j
+	}
+	return nil
+}
+
+/*
+Step 6: removes final -e if CountConsSeq() >1
+*/
+func (s *PorterStemmer) Step6() error {
+	s.j = s.k
+	if s.b[s.k] == 'e' {
+		a := s.CountConsSeq()
+		if a > 1 || a == 1 && !s.IsCVCPattern(s.k-1) {
+			s.k--
+		}
+	}
+
+	if s.b[s.k] == 'l' && s.IsConsecutiveCons(s.k) && s.CountConsSeq() > 1 {
+		s.k--
+	}
+
+	return nil
+}
+
+//stem a word
+func (s *PorterStemmer) Stem(str string) string {
+	if s.StemBytes([]bytes(str), len(str)) {
+		return s.ToString()
+	} else {
+		return str
+	}
+}
+
+func (s *PorterStemmer) StemBytes(w []bytes, l int) bool {
+	return StemBytesOffset(w, 0, l)
+}
+
+func (s *PorterStemmer) StemBytesOffset(w []bytes, o int, l int) bool {
+	s.Reset()
+	for _, v := range w {
+		append(s.b, v)
+	}
+	s.i = l
+	return StemLimit(0)
+}
+
+func (s *PorterStemmer) StemLimit(x int) bool {
+	s.k = s.i - 1
+	s.k0 = x
+	if s.k > s.k0+1 {
+		s.Step1()
+		s.Step2()
+		s.Step3()
+		s.Step4()
+		s.Step5()
+		s.Step6()
+	}
+
+	if s.i != s.k+1 {
+		dirty = true
+	}
+
+	s.i = s.k + 1
+	return dirty
+}
