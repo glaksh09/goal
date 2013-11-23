@@ -1,66 +1,42 @@
 package stemmer
 
-const INC = 50
+import (
+	"bytes"
+	"fmt"
+)
 
 type PorterStemmer struct {
-	b           []byte
-	i, j, k, k0 int
-	dirty       bool
+	b []byte
 }
 
 //reset the stemmer to stem another word
 //call reset() if calling add(byte) and then stem()
-func (s *PorterStemmer) Reset() error {
-	s.b = new([]byte)
-	s.i = 0
-	s.dirty = false
-	return nil
+func (s *PorterStemmer) Reset() {
+	s.b = s.b[0:0]
 }
 
 //Add a character to the word being stemmed.
 //After finishing adding characters, call stem(void)
 //to process the word
-func (s *PorterStemmer) Add(ch byte) error {
-
-	append(s.b, ch)
-	/*
-		if len(s.b) == s.i {
-			new_b:= new([]byte,s.i+INC)
-			for c:=0;c<s.i;c++{
-				new_b[c] = s.b[c]
-			}
-			s.b = new_b
-		}
-		s.b[s.i++] = ch
-	*/
-	return nil
+func (s *PorterStemmer) Add(ch byte) {
+	s.b = append(s.b, ch)
 }
 
 //convert the stemmed slice of word to string
-func (s *PorterStemmer) ToString() (string, error) {
-	return string(s.b), nil
-}
-
-//get length of the stemmed word
-func (s *PorterStemmer) GetResultLength() (int, error) {
-	return s.i, nil
-}
-
-//get result buffer slice
-func (s *PorterStemmer) GetResultBuffer() ([]byte, error) {
-	return s.b, nil
+func (s *PorterStemmer) ToString() string {
+	return string(s.b)
 }
 
 //check if character at index i is a consonant
-func (s *PorterStemmer) IsCons(i int) bool {
+func (s *PorterStemmer) IsConsonant(i int) bool {
 	switch s.b[i] {
 	case 'a', 'e', 'i', 'o', 'u':
 		return false
 	case 'y':
-		if i == s.k0 {
+		if i == 0 {
 			return true
 		} else {
-			return !cons(i - 1)
+			return i > 0 && !s.IsConsonant(i-1)
 		}
 	default:
 		return true
@@ -68,14 +44,14 @@ func (s *PorterStemmer) IsCons(i int) bool {
 }
 
 //measures the number of consonant sequences
-func (s *PorterStemmer) CountConsSeq() (int, error) {
+func (s *PorterStemmer) Measure() (int, error) {
 	n := 0
 	i := s.k0
 	for {
 		if i > s.j {
-			return n
+			return n, nil
 		}
-		if !s.IsCons(i) {
+		if !s.IsConsonant(i) {
 			break
 		}
 		i++
@@ -84,9 +60,9 @@ func (s *PorterStemmer) CountConsSeq() (int, error) {
 	for {
 		for {
 			if i > s.j {
-				return n
+				return n, nil
 			}
-			if s.IsCons(i) {
+			if s.IsConsonant(i) {
 				break
 			}
 			i++
@@ -95,9 +71,9 @@ func (s *PorterStemmer) CountConsSeq() (int, error) {
 		n++
 		for {
 			if i > s.j {
-				return n
+				return n, nil
 			}
-			if !s.IsCons(i) {
+			if !s.IsConsonant(i) {
 				break
 			}
 			i++
@@ -109,7 +85,7 @@ func (s *PorterStemmer) CountConsSeq() (int, error) {
 //check if there is a vowel in stem
 func (s *PorterStemmer) IsVowelInStem() bool {
 	for i := s.k0; i <= s.j; i++ {
-		if !s.IsCons(i) {
+		if !s.IsConsonant(i) {
 			return true
 		}
 	}
@@ -124,12 +100,12 @@ func (s *PorterStemmer) IsConsecutiveCons(j int) bool {
 	if s.b[j] != s.b[j-1] {
 		return false
 	}
-	return s.IsCons(j)
+	return s.IsConsonant(j)
 }
 
 //count consonant-vowel-consonant pattern
 func (s *PorterStemmer) IsCVCPattern(i int) bool {
-	if i < s.k0+2 || !s.IsCons(i) || s.IsCons(i-1) || !s.IsCons(i-2) {
+	if i < s.k0+2 || !s.IsConsonant(i) || s.IsConsonant(i-1) || !s.IsConsonant(i-2) {
 		return false
 	} else {
 		if ch := s.b[i]; ch == byte('w') || ch == byte('x') || ch == byte('y') {
@@ -139,25 +115,10 @@ func (s *PorterStemmer) IsCVCPattern(i int) bool {
 	return true
 }
 
-func (s *PorterStemmer) Ends(str string) bool {
-	l := len(str)
-	o := s.k - l + 1
-	if o < s.k0 {
-		return false
-	}
-	for i := 0; i < l; i++ {
-		if s.b[o+i] != str[i] {
-			return false
-		}
-	}
-	s.j = s.k - l
-	return true
-}
-
 //set the buffer to specified string
 func (s *PorterStemmer) SetBuffer(str string) error {
 	l := len(str)
-	o = s.j + 1
+	o := s.j + 1
 	for i := 0; i < l; i++ {
 		s.b[o+i] = str[i]
 	}
@@ -167,8 +128,8 @@ func (s *PorterStemmer) SetBuffer(str string) error {
 }
 
 //set buffer based on consonant sequences
-func (s *PorterStemmer) SetBufferOnConsSeq(str string) {
-	if s.CountConsSeq() > 0 {
+func (s *PorterStemmer) SetBufferOnConsSeq(str string) error {
+	if count, _ := s.Measure(); count > 0 {
 		s.SetBuffer(str)
 	}
 	return nil
@@ -179,19 +140,20 @@ step 1: remove plurals and -ed or -ing
 dogs -> dogs
 */
 func (s *PorterStemmer) Step1() error {
-	if s.b[s.k] == 's' {
-		if s.Ends("sses") {
-			s.k = s.k - 2
-		} else if s.Ends("ies") {
+	if bytes.HasSuffix(s.b, []byte("s")) {
+		if bytes.HasSuffix(s.b, []byte("sses"")) {
+			s.b = s.b[:len(s.b)-2]
+		} else if bytes.HasSuffix(s.b, []byte("ies")) {
 			s.SetBuffer("i")
 		} else if s.b[s.k-1] != 's' {
-			s.k = s.k - 1
+			s.k--
 		}
+		fmt.Println(s)
 	}
 
 	if s.Ends("eed") {
-		if s.CountConsSeq > 0 {
-			s.k = s.k - 1
+		if count, _ := s.Measure(); count > 0 {
+			s.k--
 		}
 	} else if (s.Ends("ed") || s.Ends("ing")) && s.IsVowelInStem() {
 		s.k = s.j
@@ -207,7 +169,7 @@ func (s *PorterStemmer) Step1() error {
 			if ch == 'l' || ch == 's' || ch == 'z' {
 				s.k++
 			}
-		} else if s.CountConsSeq() == 1 && s.IsCVCPattern(s.k) {
+		} else if count, _ := s.Measure(); count == 1 && s.IsCVCPattern(s.k) {
 			s.SetBuffer("e")
 		}
 	}
@@ -230,14 +192,14 @@ func (s *PorterStemmer) Step2() error {
 /*
 Step 3: change double suffices to sigle ones
 -ization (-ize and -ation ) -> -ize
-Precondition: CountConsSeq(string before the suffice)>0
+Precondition: Measure(string before the suffice)>0
 */
 func (s *PorterStemmer) Step3() error {
 	if s.k == s.k0 {
 		return nil
 	}
 
-	switch s.b[k-1] {
+	switch s.b[s.k-1] {
 	case 'a':
 		if s.Ends("ational") {
 			s.SetBufferOnConsSeq("ate")
@@ -340,7 +302,7 @@ Step 4: handle -ic-, -full, -ness
 */
 func (s *PorterStemmer) Step4() error {
 
-	switch s.b[k-1] {
+	switch s.b[s.k-1] {
 	case 'e':
 		if s.Ends("icate") {
 			s.SetBufferOnConsSeq("ic")
@@ -374,6 +336,8 @@ func (s *PorterStemmer) Step4() error {
 			break
 		}
 	}
+
+	return nil
 }
 
 /*
@@ -384,7 +348,7 @@ func (s *PorterStemmer) Step5() error {
 		return nil
 	}
 
-	switch s.b[k-1] {
+	switch s.b[s.k-1] {
 	case 'a':
 		if s.Ends("al") {
 			s.SetBufferOnConsSeq("ate")
@@ -460,25 +424,25 @@ func (s *PorterStemmer) Step5() error {
 		return nil
 	}
 
-	if s.CountConsSeq() > 1 {
+	if count, _ := s.Measure(); count > 1 {
 		s.k = s.j
 	}
 	return nil
 }
 
 /*
-Step 6: removes final -e if CountConsSeq() >1
+Step 6: removes final -e if Measure() >1
 */
 func (s *PorterStemmer) Step6() error {
 	s.j = s.k
 	if s.b[s.k] == 'e' {
-		a := s.CountConsSeq()
+		a, _ := s.Measure()
 		if a > 1 || a == 1 && !s.IsCVCPattern(s.k-1) {
 			s.k--
 		}
 	}
 
-	if s.b[s.k] == 'l' && s.IsConsecutiveCons(s.k) && s.CountConsSeq() > 1 {
+	if count, _ := s.Measure(); s.b[s.k] == 'l' && s.IsConsecutiveCons(s.k) && count > 1 {
 		s.k--
 	}
 
@@ -486,25 +450,26 @@ func (s *PorterStemmer) Step6() error {
 }
 
 //stem a word
-func (s *PorterStemmer) Stem(str string) string {
-	if s.StemBytes([]bytes(str), len(str)) {
+func (s *PorterStemmer) Stem(str string) (string, error) {
+	if s.StemBytes([]byte(str), len(str)) {
 		return s.ToString()
 	} else {
-		return str
+		return str, nil
 	}
 }
 
-func (s *PorterStemmer) StemBytes(w []bytes, l int) bool {
-	return StemBytesOffset(w, 0, l)
+func (s *PorterStemmer) StemBytes(w []byte, l int) bool {
+
+	return s.StemBytesOffset(w, 0, l)
 }
 
-func (s *PorterStemmer) StemBytesOffset(w []bytes, o int, l int) bool {
+func (s *PorterStemmer) StemBytesOffset(w []byte, o int, l int) bool {
 	s.Reset()
 	for _, v := range w {
-		append(s.b, v)
+		s.b = append(s.b, v)
 	}
 	s.i = l
-	return StemLimit(0)
+	return s.StemLimit(0)
 }
 
 func (s *PorterStemmer) StemLimit(x int) bool {
@@ -520,9 +485,9 @@ func (s *PorterStemmer) StemLimit(x int) bool {
 	}
 
 	if s.i != s.k+1 {
-		dirty = true
+		s.dirty = true
 	}
 
 	s.i = s.k + 1
-	return dirty
+	return s.dirty
 }

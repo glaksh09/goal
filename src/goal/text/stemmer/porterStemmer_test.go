@@ -16,11 +16,12 @@ func TestStemmer(t *testing.T) {
 	stemmer.i = 50
 	stemmer.dirty = true
 	fmt.Println(stemmer)
-	stemmer.reset()
+	stemmer.Reset()
 	fmt.Println(stemmer)
 
 	//check stem
-	stemmer.Stem(dogs)
-	fmt.Println(stemmer)
+	str1 := "dogs"
+	stemmer.Stem(str1)
+	fmt.Println(str1, " -> ", string(stemmer.b))
 
 }
