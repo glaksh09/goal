@@ -1,42 +1,336 @@
 package stemmer
 
 import (
-	"bytes"
-	"fmt"
+	"strings"
 )
 
-type PorterStemmer struct {
-	b []byte
+type PorterStemmer interface {
+	Stem(string) (string, error)
 }
 
-//reset the stemmer to stem another word
-//call reset() if calling add(byte) and then stem()
-func (s *PorterStemmer) Reset() {
-	s.b = s.b[0:0]
+//stem a word
+func Stem(origWord string) string {
+	if len(origWord) > 2 {
+		return step5b(step5a(step4(step3(step2(step1(strings.TrimSpace(origWord)))))))
+	}
+
+	return origWord
 }
 
-//Add a character to the word being stemmed.
-//After finishing adding characters, call stem(void)
-//to process the word
-func (s *PorterStemmer) Add(ch byte) {
-	s.b = append(s.b, ch)
+//Step 1 deals with plurals and past participles.
+func step1(iw string) (sw string) {
+	sw = step1a(iw)
+	sw = step1b(sw)
+	sw = step1c(sw)
+	return
 }
 
-//convert the stemmed slice of word to string
-func (s *PorterStemmer) ToString() string {
-	return string(s.b)
+func step1a(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "sses") || strings.HasSuffix(iw, "ies") {
+		return iw[:wLen-2]
+	} else if strings.HasSuffix(iw, "ss") {
+		return iw
+	} else if strings.HasSuffix(iw, "s") {
+		return iw[:wLen-1]
+	}
+
+	return iw
+}
+
+func step1b(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "eed") {
+		if measure(iw[:wLen-3]) > 0 {
+			return iw[:wLen-1]
+		}
+	} else if strings.HasSuffix(iw, "ed") {
+		if hasVowel(iw[:wLen-2]) {
+			return step1bInter(iw[:wLen-2])
+		}
+	} else if strings.HasSuffix(iw, "ing") {
+		if hasVowel(iw[:wLen-3]) {
+			return step1bInter(iw[:wLen-3])
+		}
+	}
+
+	return iw
+}
+
+func step1bInter(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "at") || strings.HasSuffix(iw, "bl") ||
+		strings.HasSuffix(iw, "iz") {
+		return iw + "e"
+	} else if astrD(iw) {
+		if iw[wLen-1] != 'l' && iw[wLen-1] != 's' && iw[wLen-1] != 'z' {
+			return iw[:wLen-1]
+		}
+	} else if astrO(iw) {
+		if measure(iw) == 1 {
+			return iw + "e"
+		}
+	}
+	return iw
+}
+
+func step1c(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "y") && hasVowel(iw[:wLen-1]) {
+		return iw[:wLen-1] + "i"
+	}
+	return iw
+}
+
+func step2(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "ational") {
+		if measure(iw[:wLen-7]) > 0 {
+			return iw[:wLen-7] + "ate"
+		}
+	} else if strings.HasSuffix(iw, "tional") {
+		if measure(iw[:wLen-6]) > 0 {
+			return iw[:wLen-2]
+		}
+	} else if strings.HasSuffix(iw, "enci") || strings.HasSuffix(iw, "anci") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-1] + "e"
+		}
+	} else if strings.HasSuffix(iw, "izer") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-4] + "ize"
+		}
+	} else if strings.HasSuffix(iw, "abli") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-4] + "able"
+		}
+	} else if strings.HasSuffix(iw, "alli") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-4] + "al"
+		}
+	} else if strings.HasSuffix(iw, "entli") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5] + "ent"
+		}
+	} else if strings.HasSuffix(iw, "eli") {
+		if measure(iw[:wLen-3]) > 0 {
+			return iw[:wLen-3] + "e"
+		}
+	} else if strings.HasSuffix(iw, "ousli") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5] + "ous"
+		}
+	} else if strings.HasSuffix(iw, "ization") {
+		if measure(iw[:wLen-7]) > 0 {
+			return iw[:wLen-7] + "ize"
+		}
+	} else if strings.HasSuffix(iw, "ation") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5] + "ate"
+		}
+	} else if strings.HasSuffix(iw, "ator") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-4] + "ate"
+		}
+	} else if strings.HasSuffix(iw, "alism") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5] + "al"
+		}
+	} else if strings.HasSuffix(iw, "iveness") {
+		if measure(iw[:wLen-7]) > 0 {
+			return iw[:wLen-7] + "ive"
+		}
+	} else if strings.HasSuffix(iw, "fulness") {
+		if measure(iw[:wLen-7]) > 0 {
+			return iw[:wLen-7] + "ful"
+		}
+	} else if strings.HasSuffix(iw, "ousness") {
+		if measure(iw[:wLen-7]) > 0 {
+			return iw[:wLen-7] + "ous"
+		}
+	} else if strings.HasSuffix(iw, "aliti") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5] + "al"
+		}
+	} else if strings.HasSuffix(iw, "iviti") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5] + "ive"
+		}
+	} else if strings.HasSuffix(iw, "biliti") {
+		if measure(iw[:wLen-6]) > 0 {
+			return iw[:wLen-6] + "ble"
+		}
+
+	}
+
+	return iw
+}
+
+func step3(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "icate") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ative") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-5]
+		}
+	} else if strings.HasSuffix(iw, "alize") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "iciti") {
+		if measure(iw[:wLen-5]) > 0 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ical") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-2]
+		}
+	} else if strings.HasSuffix(iw, "ful") {
+		if measure(iw[:wLen-3]) > 0 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ness") {
+		if measure(iw[:wLen-4]) > 0 {
+			return iw[:wLen-4]
+		}
+	}
+	return iw
+}
+
+func step4(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "al") {
+		if measure(iw[:wLen-2]) > 1 {
+			return iw[:wLen-2]
+		}
+	} else if strings.HasSuffix(iw, "ance") {
+		if measure(iw[:wLen-4]) > 1 {
+			return iw[:wLen-4]
+		}
+	} else if strings.HasSuffix(iw, "ence") {
+		if measure(iw[:wLen-4]) > 1 {
+			return iw[:wLen-4]
+		}
+	} else if strings.HasSuffix(iw, "er") {
+		if measure(iw[:wLen-2]) > 1 {
+			return iw[:wLen-2]
+		}
+	} else if strings.HasSuffix(iw, "ic") {
+		if measure(iw[:wLen-2]) > 1 {
+			return iw[:wLen-2]
+		}
+	} else if strings.HasSuffix(iw, "able") {
+		if measure(iw[:wLen-4]) > 1 {
+			return iw[:wLen-4]
+		}
+	} else if strings.HasSuffix(iw, "ible") {
+		if measure(iw[:wLen-4]) > 1 {
+			return iw[:wLen-4]
+		}
+	} else if strings.HasSuffix(iw, "ant") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ement") {
+		if measure(iw[:wLen-5]) > 1 {
+			return iw[:wLen-5]
+		}
+	} else if strings.HasSuffix(iw, "ment") {
+		if measure(iw[:wLen-4]) > 1 {
+			return iw[:wLen-4]
+		}
+	} else if strings.HasSuffix(iw, "ent") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ion") {
+		if measure(iw[:wLen-3]) > 1 {
+			if wLen > 4 && (iw[wLen-4] == 's' || iw[wLen-4] == 't') {
+				return iw[:wLen-3]
+			}
+		}
+	} else if strings.HasSuffix(iw, "ou") {
+		if measure(iw[:wLen-2]) > 1 {
+			return iw[:wLen-2]
+		}
+	} else if strings.HasSuffix(iw, "ism") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ate") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "iti") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ous") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ive") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	} else if strings.HasSuffix(iw, "ize") {
+		if measure(iw[:wLen-3]) > 1 {
+			return iw[:wLen-3]
+		}
+	}
+	return iw
+}
+
+func step5a(iw string) string {
+	wLen := len(iw)
+	if strings.HasSuffix(iw, "e") && measure(iw[:wLen-1]) > 1 {
+		return iw[:wLen-1]
+	} else if strings.HasSuffix(iw, "e") && measure(iw[:wLen-1]) == 1 && !astrO(iw[:wLen-1]) {
+		return iw[:wLen-1]
+	}
+	return iw
+}
+
+func step5b(iw string) string {
+	wLen := len(iw)
+	if measure(iw) > 1 && isConsonant(iw, wLen-1) && isConsonant(iw, wLen-2) && iw[wLen-1] == 'l' {
+		return iw[:wLen-1]
+	}
+	return iw
+}
+
+//the stem ends cvc, where the second c is not W, X or Y
+func astrO(iw string) bool {
+	wLen := len(iw) - 1
+	if wLen >= 2 && isConsonant(iw, wLen-2) && !isConsonant(iw, wLen-1) && isConsonant(iw, wLen) {
+		return iw[wLen] != 'w' && iw[wLen] != 'x' && iw[wLen] != 'y'
+	}
+	return false
+}
+
+//double consonants
+func astrD(iw string) bool {
+	wLen := len(iw)
+	return iw[wLen-1] == iw[wLen-2] && isConsonant(iw, wLen-1)
 }
 
 //check if character at index i is a consonant
-func (s *PorterStemmer) IsConsonant(i int) bool {
-	switch s.b[i] {
+func isConsonant(w string, i int) bool {
+	wLen := len(w)
+	if wLen < i || i < 0 {
+		return false
+	}
+	switch w[i] {
 	case 'a', 'e', 'i', 'o', 'u':
 		return false
 	case 'y':
 		if i == 0 {
 			return true
 		} else {
-			return i > 0 && !s.IsConsonant(i-1)
+			return i > 0 && !isConsonant(w, i-1)
 		}
 	default:
 		return true
@@ -44,450 +338,48 @@ func (s *PorterStemmer) IsConsonant(i int) bool {
 }
 
 //measures the number of consonant sequences
-func (s *PorterStemmer) Measure() (int, error) {
-	n := 0
-	i := s.k0
-	for {
-		if i > s.j {
-			return n, nil
-		}
-		if !s.IsConsonant(i) {
-			break
-		}
-		i++
+func measure(w string) (val int64) {
+	wLen := len(w)
+
+	if wLen <= 0 {
+		return
 	}
-	i++
-	for {
-		for {
-			if i > s.j {
-				return n, nil
-			}
-			if s.IsConsonant(i) {
-				break
-			}
+
+	ptr := 0
+	//ignore consonant at start
+	for isConsonant(w, ptr) {
+		ptr++
+		if ptr >= wLen {
+			return val
+		}
+	}
+
+	incVal := false
+	//count Vowel-Consonant pair
+	for i := ptr; i < wLen; i++ {
+		for i < wLen && !isConsonant(w, i) {
 			i++
 		}
-		i++
-		n++
-		for {
-			if i > s.j {
-				return n, nil
-			}
-			if !s.IsConsonant(i) {
-				break
-			}
+		for i < wLen && isConsonant(w, i) {
 			i++
+			incVal = true
 		}
-		i++
+
+		if incVal {
+			val++
+			incVal = false
+		}
 	}
+
+	return
 }
 
-//check if there is a vowel in stem
-func (s *PorterStemmer) IsVowelInStem() bool {
-	for i := s.k0; i <= s.j; i++ {
-		if !s.IsConsonant(i) {
+//checks if stem contains a vowel
+func hasVowel(str string) bool {
+	for i := 0; i < len(str); i++ {
+		if !isConsonant(str, i) {
 			return true
 		}
 	}
 	return false
-}
-
-//check if two consecutive consonants are present
-func (s *PorterStemmer) IsConsecutiveCons(j int) bool {
-	if j < s.k0 {
-		return false
-	}
-	if s.b[j] != s.b[j-1] {
-		return false
-	}
-	return s.IsConsonant(j)
-}
-
-//count consonant-vowel-consonant pattern
-func (s *PorterStemmer) IsCVCPattern(i int) bool {
-	if i < s.k0+2 || !s.IsConsonant(i) || s.IsConsonant(i-1) || !s.IsConsonant(i-2) {
-		return false
-	} else {
-		if ch := s.b[i]; ch == byte('w') || ch == byte('x') || ch == byte('y') {
-			return false
-		}
-	}
-	return true
-}
-
-//set the buffer to specified string
-func (s *PorterStemmer) SetBuffer(str string) error {
-	l := len(str)
-	o := s.j + 1
-	for i := 0; i < l; i++ {
-		s.b[o+i] = str[i]
-	}
-	s.k = s.j + l
-	s.dirty = true
-	return nil
-}
-
-//set buffer based on consonant sequences
-func (s *PorterStemmer) SetBufferOnConsSeq(str string) error {
-	if count, _ := s.Measure(); count > 0 {
-		s.SetBuffer(str)
-	}
-	return nil
-}
-
-/*
-step 1: remove plurals and -ed or -ing
-dogs -> dogs
-*/
-func (s *PorterStemmer) Step1() error {
-	if bytes.HasSuffix(s.b, []byte("s")) {
-		if bytes.HasSuffix(s.b, []byte("sses"")) {
-			s.b = s.b[:len(s.b)-2]
-		} else if bytes.HasSuffix(s.b, []byte("ies")) {
-			s.SetBuffer("i")
-		} else if s.b[s.k-1] != 's' {
-			s.k--
-		}
-		fmt.Println(s)
-	}
-
-	if s.Ends("eed") {
-		if count, _ := s.Measure(); count > 0 {
-			s.k--
-		}
-	} else if (s.Ends("ed") || s.Ends("ing")) && s.IsVowelInStem() {
-		s.k = s.j
-		if s.Ends("at") {
-			s.SetBuffer("ate")
-		} else if s.Ends("bl") {
-			s.SetBuffer("ble")
-		} else if s.Ends("iz") {
-			s.SetBuffer("ize")
-		} else if s.IsConsecutiveCons(s.k) {
-			ch := s.b[s.k]
-			s.k--
-			if ch == 'l' || ch == 's' || ch == 'z' {
-				s.k++
-			}
-		} else if count, _ := s.Measure(); count == 1 && s.IsCVCPattern(s.k) {
-			s.SetBuffer("e")
-		}
-	}
-
-	return nil
-}
-
-/*
-Step 2:
-change 'y' to 'i' when another vowel is present in the stem
-*/
-func (s *PorterStemmer) Step2() error {
-	if s.Ends("y") && s.IsVowelInStem() {
-		s.b[s.k] = 'i'
-		s.dirty = true
-	}
-	return nil
-}
-
-/*
-Step 3: change double suffices to sigle ones
--ization (-ize and -ation ) -> -ize
-Precondition: Measure(string before the suffice)>0
-*/
-func (s *PorterStemmer) Step3() error {
-	if s.k == s.k0 {
-		return nil
-	}
-
-	switch s.b[s.k-1] {
-	case 'a':
-		if s.Ends("ational") {
-			s.SetBufferOnConsSeq("ate")
-			break
-		}
-		if s.Ends("tional") {
-			s.SetBufferOnConsSeq("tion")
-			break
-		}
-	case 'c':
-		if s.Ends("enci") {
-			s.SetBufferOnConsSeq("ence")
-			break
-		}
-		if s.Ends("anci") {
-			s.SetBufferOnConsSeq("ance")
-			break
-		}
-	case 'e':
-		if s.Ends("izer") {
-			s.SetBufferOnConsSeq("ize")
-			break
-		}
-	case 'l':
-		if s.Ends("bli") {
-			s.SetBufferOnConsSeq("ble")
-			break
-		}
-		if s.Ends("alli") {
-			s.SetBufferOnConsSeq("al")
-			break
-		}
-		if s.Ends("entli") {
-			s.SetBufferOnConsSeq("ent")
-			break
-		}
-		if s.Ends("eli") {
-			s.SetBufferOnConsSeq("e")
-			break
-		}
-		if s.Ends("ousli") {
-			s.SetBufferOnConsSeq("ous")
-			break
-		}
-	case 'o':
-		if s.Ends("ization") {
-			s.SetBufferOnConsSeq("ize")
-			break
-		}
-		if s.Ends("ation") {
-			s.SetBufferOnConsSeq("ate")
-			break
-		}
-		if s.Ends("ator") {
-			s.SetBufferOnConsSeq("ate")
-			break
-		}
-	case 's':
-		if s.Ends("alism") {
-			s.SetBufferOnConsSeq("al")
-			break
-		}
-		if s.Ends("iveness") {
-			s.SetBufferOnConsSeq("ive")
-			break
-		}
-		if s.Ends("fulness") {
-			s.SetBufferOnConsSeq("ful")
-			break
-		}
-		if s.Ends("ousness") {
-			s.SetBufferOnConsSeq("ous")
-			break
-		}
-	case 't':
-		if s.Ends("aliti") {
-			s.SetBufferOnConsSeq("al")
-			break
-		}
-		if s.Ends("iviti") {
-			s.SetBufferOnConsSeq("ive")
-			break
-		}
-		if s.Ends("biliti") {
-			s.SetBufferOnConsSeq("ble")
-			break
-		}
-	case 'g':
-		if s.Ends("logi") {
-			s.SetBufferOnConsSeq("log")
-			break
-		}
-
-	}
-	return nil
-}
-
-/*
-Step 4: handle -ic-, -full, -ness
-*/
-func (s *PorterStemmer) Step4() error {
-
-	switch s.b[s.k-1] {
-	case 'e':
-		if s.Ends("icate") {
-			s.SetBufferOnConsSeq("ic")
-			break
-		}
-		if s.Ends("ative") {
-			s.SetBufferOnConsSeq("")
-			break
-		}
-		if s.Ends("alize") {
-			s.SetBufferOnConsSeq("al")
-			break
-		}
-	case 'i':
-		if s.Ends("iciti") {
-			s.SetBufferOnConsSeq("ic")
-			break
-		}
-	case 'l':
-		if s.Ends("ical") {
-			s.SetBufferOnConsSeq("ic")
-			break
-		}
-		if s.Ends("ful") {
-			s.SetBufferOnConsSeq("")
-			break
-		}
-	case 's':
-		if s.Ends("ness") {
-			s.SetBufferOnConsSeq("")
-			break
-		}
-	}
-
-	return nil
-}
-
-/*
-Step 5: handle -ant, -ence
-*/
-func (s *PorterStemmer) Step5() error {
-	if s.k == s.k0 {
-		return nil
-	}
-
-	switch s.b[s.k-1] {
-	case 'a':
-		if s.Ends("al") {
-			s.SetBufferOnConsSeq("ate")
-			break
-		}
-	case 'c':
-		if s.Ends("ance") {
-			break
-		}
-		if s.Ends("ence") {
-			break
-		}
-	case 'e':
-		if s.Ends("er") {
-			break
-		}
-	case 'i':
-		if s.Ends("ic") {
-			break
-		}
-
-	case 'l':
-		if s.Ends("able") {
-			break
-		}
-		if s.Ends("ible") {
-			break
-		}
-	case 'n':
-		if s.Ends("ant") {
-			break
-		}
-		if s.Ends("ement") {
-			break
-		}
-		if s.Ends("ment") {
-			break
-		}
-		if s.Ends("ent") {
-			break
-		}
-	case 'o':
-		if s.Ends("ion") && s.j >= 0 && (s.b[s.j] == 's' || s.b[s.j] == 't') {
-			break
-		}
-		if s.Ends("ou") {
-			break
-		}
-	case 's':
-		if s.Ends("ism") {
-			break
-		}
-	case 't':
-		if s.Ends("ate") {
-			break
-		}
-		if s.Ends("iti") {
-			break
-		}
-	case 'u':
-		if s.Ends("ous") {
-			break
-		}
-	case 'v':
-		if s.Ends("ive") {
-			break
-		}
-	case 'z':
-		if s.Ends("ize") {
-			break
-		}
-	default:
-		return nil
-	}
-
-	if count, _ := s.Measure(); count > 1 {
-		s.k = s.j
-	}
-	return nil
-}
-
-/*
-Step 6: removes final -e if Measure() >1
-*/
-func (s *PorterStemmer) Step6() error {
-	s.j = s.k
-	if s.b[s.k] == 'e' {
-		a, _ := s.Measure()
-		if a > 1 || a == 1 && !s.IsCVCPattern(s.k-1) {
-			s.k--
-		}
-	}
-
-	if count, _ := s.Measure(); s.b[s.k] == 'l' && s.IsConsecutiveCons(s.k) && count > 1 {
-		s.k--
-	}
-
-	return nil
-}
-
-//stem a word
-func (s *PorterStemmer) Stem(str string) (string, error) {
-	if s.StemBytes([]byte(str), len(str)) {
-		return s.ToString()
-	} else {
-		return str, nil
-	}
-}
-
-func (s *PorterStemmer) StemBytes(w []byte, l int) bool {
-
-	return s.StemBytesOffset(w, 0, l)
-}
-
-func (s *PorterStemmer) StemBytesOffset(w []byte, o int, l int) bool {
-	s.Reset()
-	for _, v := range w {
-		s.b = append(s.b, v)
-	}
-	s.i = l
-	return s.StemLimit(0)
-}
-
-func (s *PorterStemmer) StemLimit(x int) bool {
-	s.k = s.i - 1
-	s.k0 = x
-	if s.k > s.k0+1 {
-		s.Step1()
-		s.Step2()
-		s.Step3()
-		s.Step4()
-		s.Step5()
-		s.Step6()
-	}
-
-	if s.i != s.k+1 {
-		s.dirty = true
-	}
-
-	s.i = s.k + 1
-	return s.dirty
 }

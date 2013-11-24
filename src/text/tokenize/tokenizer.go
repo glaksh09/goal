@@ -1,7 +1,7 @@
 package tokenize
 
 import (
-	"goal/util"
+	"util"
 	"strings"
 )
 
